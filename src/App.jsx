@@ -1,11 +1,23 @@
 import { useMemo, useState } from 'react'
 import { SECTIONS } from './data/sections.js'
+import { DEFAULT_SPECIES_ID } from './data/species.js'
 import { buildPrompt, countFilledSections } from './utils/buildPrompt.js'
 import Section from './components/Section.jsx'
 import Character from './components/Character.jsx'
+import SpeciesPicker from './components/SpeciesPicker.jsx'
+import useLocalStorage from './hooks/useLocalStorage.js'
+
+const STORAGE_KEYS = {
+  form: 'eco-prompt:form',
+  ecoMode: 'eco-prompt:ecoMode',
+  species: 'eco-prompt:species',
+}
 
 export default function App() {
-  const [form, setForm] = useState({})
+  const [form, setForm] = useLocalStorage(STORAGE_KEYS.form, {})
+  const [ecoMode, setEcoMode] = useLocalStorage(STORAGE_KEYS.ecoMode, true)
+  const [speciesId, setSpeciesId] = useLocalStorage(STORAGE_KEYS.species, DEFAULT_SPECIES_ID)
+
   const [output, setOutput] = useState('')
   const [loading, setLoading] = useState(false)
   const [imageUrl, setImageUrl] = useState('')
@@ -25,7 +37,6 @@ export default function App() {
     setTimeout(() => setCheered(false), 1800)
     if (!prompt) return
 
-    // Try the serverless endpoint. If not deployed (404), just keep the text.
     setLoading(true)
     try {
       const res = await fetch('/api/generate', {
@@ -34,9 +45,7 @@ export default function App() {
         body: JSON.stringify({ prompt }),
       })
       if (!res.ok) {
-        if (res.status === 404) {
-          // No backend in dev → that's the fallback path; do nothing.
-        } else {
+        if (res.status !== 404) {
           const t = await res.text()
           setError(`이미지 생성 실패: ${t.slice(0, 200)}`)
         }
@@ -45,8 +54,8 @@ export default function App() {
       const data = await res.json()
       if (data.imageBase64) setImageUrl(`data:image/png;base64,${data.imageBase64}`)
       else if (data.imageUrl) setImageUrl(data.imageUrl)
-    } catch (e) {
-      // No /api in dev → silently fall back to text output
+    } catch {
+      /* dev mode without serverless — silent text fallback */
     } finally {
       setLoading(false)
     }
@@ -57,13 +66,21 @@ export default function App() {
     try { await navigator.clipboard.writeText(output) } catch {}
   }
 
+  const handleReset = () => {
+    if (!confirm('모든 입력을 지울까요?')) return
+    setForm({})
+    setOutput('')
+    setImageUrl('')
+    setError('')
+  }
+
   const required = SECTIONS.filter((s) => s.required)
   const optional = SECTIONS.filter((s) => !s.required)
 
   return (
     <div className="min-h-screen pb-40">
       <header className="border-b border-slate-200 bg-white/70 backdrop-blur sticky top-0 z-40">
-        <div className="max-w-6xl mx-auto px-6 py-3 flex items-center justify-between">
+        <div className="max-w-6xl mx-auto px-6 py-3 flex items-center justify-between gap-3 flex-wrap">
           <div className="flex items-center gap-3">
             <img src="/seal/seal-3.png" alt="" className="w-8 h-8 object-contain" />
             <div>
@@ -71,13 +88,15 @@ export default function App() {
               <p className="text-xs text-slate-500">이미지 생성 에코 모드 · 상세 프롬프트 템플릿</p>
             </div>
           </div>
-          <div className="flex items-center gap-2 text-xs text-eco-600 bg-eco-50 px-3 py-1.5 rounded-full">
-            <span className="w-2 h-2 rounded-full bg-eco-500" />
-            Eco Mode ON
+          <div className="flex items-center gap-3 flex-wrap">
+            {ecoMode && (
+              <SpeciesPicker value={speciesId} onChange={setSpeciesId} />
+            )}
+            <EcoModeToggle on={ecoMode} onChange={setEcoMode} />
           </div>
         </div>
         <div className="max-w-6xl mx-auto px-6 pb-3">
-          <Progress filled={filled} total={SECTIONS.length} />
+          <Progress filled={filled} total={SECTIONS.length} ecoMode={ecoMode} />
         </div>
       </header>
 
@@ -95,7 +114,7 @@ export default function App() {
       </main>
 
       <footer className="fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur border-t border-slate-200">
-        <div className="max-w-6xl mx-auto px-6 py-3 flex items-center gap-3">
+        <div className="max-w-6xl mx-auto px-6 py-3 flex items-center gap-3 flex-wrap">
           <button
             onClick={handleGenerate}
             disabled={!prompt || loading}
@@ -110,7 +129,13 @@ export default function App() {
           >
             복사
           </button>
-          <div className="text-xs text-slate-500 flex-1 truncate">
+          <button
+            onClick={handleReset}
+            className="px-3 py-2 rounded-lg border border-slate-300 text-sm text-slate-500 hover:border-red-400 hover:text-red-500"
+          >
+            초기화
+          </button>
+          <div className="text-xs text-slate-500 flex-1 truncate min-w-[120px]">
             {output ? `${output.length}자 / ${filled}/${SECTIONS.length} 섹션 완료` : '템플릿 내용이 여기에 출력됩니다.'}
           </div>
         </div>
@@ -129,7 +154,9 @@ export default function App() {
         )}
       </footer>
 
-      <Character filledCount={filled} justCheered={cheered} />
+      {ecoMode && (
+        <Character filledCount={filled} justCheered={cheered} speciesId={speciesId} />
+      )}
     </div>
   )
 }
@@ -145,13 +172,18 @@ function Column({ title, tone, children }) {
   )
 }
 
-function Progress({ filled, total }) {
+function Progress({ filled, total, ecoMode }) {
   const pct = Math.round((filled / total) * 100)
   return (
     <div className="flex items-center gap-3">
       <div className="flex-1 h-2 bg-slate-200 rounded-full overflow-hidden">
         <div
-          className="h-full bg-gradient-to-r from-eco-500 to-seal transition-all duration-500"
+          className={
+            'h-full transition-all duration-500 ' +
+            (ecoMode
+              ? 'bg-gradient-to-r from-eco-500 to-seal'
+              : 'bg-slate-400')
+          }
           style={{ width: `${pct}%` }}
         />
       </div>
@@ -159,5 +191,24 @@ function Progress({ filled, total }) {
         {filled}/{total} 섹션 · {pct}%
       </div>
     </div>
+  )
+}
+
+function EcoModeToggle({ on, onChange }) {
+  return (
+    <button
+      type="button"
+      onClick={() => onChange(!on)}
+      className={
+        'flex items-center gap-2 text-xs px-3 py-1.5 rounded-full transition ' +
+        (on
+          ? 'bg-eco-50 text-eco-600 border border-eco-500/40'
+          : 'bg-slate-100 text-slate-500 border border-slate-200')
+      }
+      aria-pressed={on}
+    >
+      <span className={'w-2 h-2 rounded-full ' + (on ? 'bg-eco-500' : 'bg-slate-400')} />
+      Eco Mode {on ? 'ON' : 'OFF'}
+    </button>
   )
 }
