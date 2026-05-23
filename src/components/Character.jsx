@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
 
-// Map filled section count to seal sprite index (1..5)
-function spriteFor(filled) {
+// Map filled section count → animation stage (1..5).
+// Mirrors the asset stages stage1..stage5 from /public/seal/anim/.
+function stageFor(filled) {
   if (filled <= 0) return 1
   if (filled <= 3) return 2
   if (filled === 4) return 3
@@ -10,34 +11,38 @@ function spriteFor(filled) {
 }
 
 export default function Character({ filledCount, justCheered }) {
-  const idx = spriteFor(filledCount)
-  const [tilt, setTilt] = useState(false)
+  const stage = stageFor(filledCount)
+  const [celebrating, setCelebrating] = useState(false)
   const lastFilled = useRef(filledCount)
 
-  // Trigger a one-shot tilt whenever the user finishes a new section
+  // When the user finishes a new section OR hits the generate button,
+  // play the final_celebration animation once, then return to the idle stage.
   useEffect(() => {
-    if (filledCount > lastFilled.current) {
-      setTilt(true)
-      const t = setTimeout(() => setTilt(false), 700)
-      return () => clearTimeout(t)
-    }
+    const sectionJustCompleted = filledCount > lastFilled.current
     lastFilled.current = filledCount
-  }, [filledCount])
+    if (!justCheered && !sectionJustCompleted) return
+
+    setCelebrating(true)
+    // final_celebration runs ~2s at 12fps; give it a beat
+    const t = setTimeout(() => setCelebrating(false), 1800)
+    return () => clearTimeout(t)
+  }, [filledCount, justCheered])
+
+  // Key forces the browser to restart the APNG when it changes — so the
+  // celebration plays from frame 1 every time, not from wherever it was paused.
+  const src = celebrating
+    ? '/seal/anim/final_celebration.png'
+    : `/seal/anim/stage${stage}.png`
+  const key = celebrating ? `cheer-${filledCount}-${Date.now()}` : `stage-${stage}`
 
   return (
     <div className="fixed bottom-4 right-4 z-50 pointer-events-none">
-      <div
-        className={
-          'w-32 h-32 sm:w-40 sm:h-40 ' +
-          (justCheered ? 'animate-cheer' : tilt ? 'animate-tilt' : 'animate-breathe')
-        }
-      >
-        <img
-          src={`/seal/seal-${idx}.png`}
-          alt={`seal expression ${idx}`}
-          className="w-full h-full object-contain drop-shadow"
-        />
-      </div>
+      <img
+        key={key}
+        src={src}
+        alt={celebrating ? 'seal celebrating' : `seal stage ${stage}`}
+        className="w-40 h-40 sm:w-48 sm:h-48 object-contain drop-shadow"
+      />
     </div>
   )
 }
