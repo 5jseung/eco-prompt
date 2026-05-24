@@ -8,43 +8,48 @@ export default function App() {
   const [form, setForm] = useState({})
   const [output, setOutput] = useState('')
   const [loading, setLoading] = useState(false)
-  const [imageUrl, setImageUrl] = useState('')
   const [error, setError] = useState('')
   const [cheered, setCheered] = useState(false)
+  const [collapsedSections, setCollapsedSections] = useState({})
 
   const filled = useMemo(() => countFilledSections(form), [form])
   const prompt = useMemo(() => buildPrompt(form), [form])
 
   const setSection = (id, v) => setForm((f) => ({ ...f, [id]: v }))
+  const collapseAllSections = () => {
+    setCollapsedSections(Object.fromEntries(SECTIONS.map((s) => [s.id, true])))
+  }
+  const toggleSection = (id) => {
+    setCollapsedSections((s) => ({ ...s, [id]: !s[id] }))
+  }
 
   const handleGenerate = async () => {
     setOutput(prompt)
     setError('')
-    setImageUrl('')
     setCheered(true)
     setTimeout(() => setCheered(false), 1800)
     if (!prompt) return
+    collapseAllSections()
 
-    // Try the serverless endpoint. If not deployed (404), just keep the text.
+    // Try the serverless endpoint. If not deployed (404), keep the local prompt draft.
     setLoading(true)
     try {
       const res = await fetch('/api/generate', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ prompt }),
+        body: JSON.stringify({ prompt, form, sections: SECTIONS }),
       })
       if (!res.ok) {
         if (res.status === 404) {
           // No backend in dev → that's the fallback path; do nothing.
         } else {
           const t = await res.text()
-          setError(`이미지 생성 실패: ${t.slice(0, 200)}`)
+          setError(`프롬프트 생성 실패: ${t.slice(0, 200)}`)
         }
         return
       }
       const data = await res.json()
-      if (data.imageBase64) setImageUrl(`data:image/png;base64,${data.imageBase64}`)
-      else if (data.imageUrl) setImageUrl(data.imageUrl)
+      if (data.text) setOutput(data.text)
     } catch (e) {
       // No /api in dev → silently fall back to text output
     } finally {
@@ -61,7 +66,7 @@ export default function App() {
   const optional = SECTIONS.filter((s) => !s.required)
 
   return (
-    <div className="min-h-screen pb-40">
+    <div className={(output || error) ? 'min-h-screen pb-80' : 'min-h-screen pb-20'}>
       <header className="border-b border-slate-200 bg-white/70 backdrop-blur sticky top-0 z-40">
         <div className="max-w-6xl mx-auto px-6 py-3 flex items-center justify-between">
           <div className="flex items-center gap-3">
@@ -81,27 +86,62 @@ export default function App() {
         </div>
       </header>
 
-      <main className="max-w-6xl mx-auto px-6 py-6 grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <Column title="[필수 섹션] REQUIRED" tone="required">
-          {required.map((s) => (
-            <Section key={s.id} section={s} value={form[s.id]} onChange={(v) => setSection(s.id, v)} />
-          ))}
-        </Column>
-        <Column title="[선택 섹션] OPTIONAL" tone="optional">
-          {optional.map((s) => (
-            <Section key={s.id} section={s} value={form[s.id]} onChange={(v) => setSection(s.id, v)} />
-          ))}
-        </Column>
+      <main className="max-w-6xl mx-auto px-6 py-6">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <Column title="[필수 섹션] REQUIRED" tone="required">
+            {required.map((s) => (
+              <Section
+                key={s.id}
+                section={s}
+                value={form[s.id]}
+                onChange={(v) => setSection(s.id, v)}
+                collapsed={Boolean(output && collapsedSections[s.id])}
+                onToggle={() => toggleSection(s.id)}
+                reviewMode={Boolean(output)}
+              />
+            ))}
+          </Column>
+          <Column title="[선택 섹션] OPTIONAL" tone="optional">
+            {optional.map((s) => (
+              <Section
+                key={s.id}
+                section={s}
+                value={form[s.id]}
+                onChange={(v) => setSection(s.id, v)}
+                collapsed={Boolean(output && collapsedSections[s.id])}
+                onToggle={() => toggleSection(s.id)}
+                reviewMode={Boolean(output)}
+              />
+            ))}
+          </Column>
+        </div>
       </main>
 
       <footer className="fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur border-t border-slate-200">
+        {(output || error) && (
+          <div className="max-w-6xl mx-auto px-6 pt-4">
+            <div className="mb-2 flex items-center justify-between gap-3">
+              <h2 className="text-sm font-semibold text-slate-800">생성된 프롬프트</h2>
+              {output && <span className="text-xs text-slate-500">{output.length}자</span>}
+            </div>
+            {error && <div className="text-xs text-red-600 mb-2">{error}</div>}
+            {output && (
+              <textarea
+                value={output}
+                onChange={(e) => setOutput(e.target.value)}
+                rows={5}
+                className="h-32 w-full resize-none rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm leading-6 text-slate-800 focus:border-seal focus:outline-none"
+              />
+            )}
+          </div>
+        )}
         <div className="max-w-6xl mx-auto px-6 py-3 flex items-center gap-3">
           <button
             onClick={handleGenerate}
             disabled={!prompt || loading}
             className="px-4 py-2 rounded-lg bg-seal text-white text-sm font-medium hover:bg-seal-dark disabled:opacity-40"
           >
-            {loading ? '생성 중…' : '프롬프트 출력하기'}
+            {loading ? '생성 중…' : '프롬프트 생성하기'}
           </button>
           <button
             onClick={handleCopy}
@@ -114,19 +154,6 @@ export default function App() {
             {output ? `${output.length}자 / ${filled}/${SECTIONS.length} 섹션 완료` : '템플릿 내용이 여기에 출력됩니다.'}
           </div>
         </div>
-        {(output || error) && (
-          <div className="max-w-6xl mx-auto px-6 pb-4">
-            {error && <div className="text-xs text-red-600 mb-2">{error}</div>}
-            <pre className="whitespace-pre-wrap text-xs bg-slate-50 border border-slate-200 rounded-lg p-3 max-h-48 overflow-auto">
-{output}
-            </pre>
-            {imageUrl && (
-              <div className="mt-3">
-                <img src={imageUrl} alt="generated" className="max-h-64 rounded-lg border border-slate-200" />
-              </div>
-            )}
-          </div>
-        )}
       </footer>
 
       <Character filledCount={filled} justCheered={cheered} />

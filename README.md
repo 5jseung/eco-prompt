@@ -2,18 +2,27 @@
 
 A prototype prompting interface that nudges users toward more efficient, detailed prompts for AI image generation. Built for HCI 팀과제 3.
 
-The UI is a guided prompt builder (8 structured sections) paired with a seal character whose expression shifts from distressed → content as the user fills more sections. The goal is an **eco-nudge**, not a literal impact metric.
+The UI is a guided prompt builder (8 structured sections) paired with a seal character whose expression shifts from distressed → content as the user fills more sections. The app does **not** generate images directly; it generates a paste-ready image-generation prompt that users can edit and copy. The goal is an **eco-nudge**, not a literal impact metric.
+
+Current flow:
+1. The user fills structured prompt sections.
+2. The app assembles a local prompt draft.
+3. If `GEMINI_API_KEY` is configured, Gemini rewrites the form data into a polished, executable image-generation prompt.
+4. If no key is configured, the local draft is shown as a fallback.
+5. After generation, form sections collapse into selected-value summaries and the generated prompt remains editable in a fixed bottom panel.
 
 ---
 
 ## Stack
 
 - **Vite + React + Tailwind CSS** — single-page frontend
-- **Vercel serverless function** (`/api/generate`) — optional Gemini API call (key kept server-side)
+- **Gemini API** — optional prompt-writing call that rewrites form inputs into a polished final prompt
+- **Local Vite API middleware** — runs `/api/generate` during `npm run dev`
+- **Vercel serverless function** (`/api/generate`) — uses the same API handler after deployment
 - **GitHub** — version control / collaboration
 - **Vercel** — hosting (free, deploys on every push)
 
-Fallback behavior: if no Gemini key is configured, the "프롬프트 출력하기" button just renders the assembled prompt as text. That covers the user-study fallback path from the meeting notes.
+Fallback behavior: if no Gemini key is configured, the "프롬프트 생성하기" button renders the locally assembled prompt draft as text. If a Gemini key is configured, Gemini rewrites the filled form information into a polished final image-generation prompt.
 
 ---
 
@@ -32,26 +41,29 @@ npm run dev
 # → opens http://localhost:5173
 ```
 
-That's it for working on the UI. The `/api/generate` endpoint is a Vercel function — it won't run under `npm run dev` (the frontend silently falls back to text output, which is fine while iterating).
+That's it for working on the UI. In local development, Vite also runs a small local middleware for `/api/generate`, so Gemini prompt generation can be tested with `npm run dev` without using the Vercel CLI.
 
 ### Running with the Gemini API locally
 
-Only do this when you actually want to test image generation end-to-end.
+Only do this when you actually want to test Gemini-powered prompt generation end-to-end.
 
 ```bash
-# install vercel cli once
-npm i -g vercel
-
 # create your local env file
-cp .env.example .env.local
-# then put a real key from https://aistudio.google.com/apikey into .env.local
+cp .env.example .env
+# then put a real key from https://aistudio.google.com/apikey into .env
 
-# run with the serverless function active
-vercel dev
-# → http://localhost:3000
+# run the normal dev server
+npm run dev
+# → http://localhost:5173, or the next available port
 ```
 
-`.env.local` is gitignored — your key never leaves your machine.
+`.env`, `.env.local`, and other local env files are gitignored — your key never leaves your machine.
+
+### When to use Vercel locally
+
+You usually do **not** need Vercel for local development. Use `npm run dev` for UI work and Gemini prompt-generation testing.
+
+Use `vercel dev` only when you specifically need to test the exact Vercel serverless runtime before deployment.
 
 ---
 
@@ -60,13 +72,13 @@ vercel dev
 ```
 hci/
 ├── api/
-│   └── generate.js        # Vercel serverless: calls Gemini if key is set
+│   └── generate.js        # Vercel serverless: asks Gemini to write a final prompt if key is set
 ├── docs/                  # meeting notes, wireframes, original PDFs
 ├── public/
 │   └── seal/              # seal-1..5.png (sad → happy)
 ├── src/
 │   ├── components/
-│   │   ├── Character.jsx  # bottom-right seal + speech bubble
+│   │   ├── Character.jsx  # bottom-right seal expression + animation
 │   │   ├── Field.jsx      # multi/single/text input primitives
 │   │   └── Section.jsx    # one prompt section
 │   ├── data/
@@ -79,7 +91,7 @@ hci/
 ├── index.html
 ├── package.json
 ├── tailwind.config.js
-├── vite.config.js
+├── vite.config.js       # Vite config + local /api/generate middleware
 └── .env.example
 ```
 
@@ -91,8 +103,25 @@ hci/
 | Change how the prompt string is assembled     | `src/utils/buildPrompt.js`      |
 | Tweak the character animation triggers        | `src/components/Character.jsx`  |
 | Change the layout / header / output area      | `src/App.jsx`                   |
+| Change collapsed-section summary behavior     | `src/components/Section.jsx`    |
 | Swap colors / animations                      | `tailwind.config.js`            |
-| Use a different image model / endpoint        | `api/generate.js`               |
+| Use a different prompt model / endpoint       | `api/generate.js`               |
+
+---
+
+## Current UX behavior
+
+- The bottom-right seal changes expression based on completed section count:
+  - 0 sections → `seal-1`
+  - 1-3 sections → `seal-2`
+  - 4 sections → `seal-3`
+  - 5 sections → `seal-4`
+  - 6+ sections → `seal-5`
+- The seal no longer shows always-on speech-bubble facts. This avoids unsupported environmental claims during user testing.
+- After prompt generation, every section collapses into a summary showing only selected or typed values.
+- A collapsed section can be clicked anywhere to reopen it. Open sections show a small `접기` control.
+- The generated prompt is editable. The `복사` button copies the edited text, not the original generated text.
+- The prompt editor stays fixed at the bottom after generation, with page padding reserved so sections are still reachable while scrolling.
 
 ---
 
@@ -138,7 +167,8 @@ Rules of thumb:
 ## What's still TODO
 
 - [ ] Penguin and bee character sprites (only seal is wired up)
-- [ ] Hover info on endangered species (from 회의록 0517)
-- [ ] Article links on character click
-- [ ] Speech-bubble content review (currently placeholder facts)
+- [ ] Hover info card for endangered species, ideally with sourced animal facts
+- [ ] Article/source links on character click
+- [ ] Decide whether to bring back speech-bubble content with cited sources
 - [ ] Tighten copy / Korean strings before user study
+- [ ] Test Gemini prompt quality across sparse, Korean, and highly detailed inputs
