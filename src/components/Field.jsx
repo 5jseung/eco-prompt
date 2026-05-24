@@ -13,6 +13,7 @@ export function MultiCheck({ options, value = [], onChange, custom = false }) {
   // Custom values = anything in `value` that isn't one of the predefined options.
   const customVals = value.filter((v) => !options.includes(v))
   const customStr = customVals.join(', ')
+  const [customInput, setCustomInput] = useState(customStr)
   const hasCustom = customVals.length > 0
 
   // Tracks whether the user explicitly opened the custom input via "Other".
@@ -31,6 +32,7 @@ export function MultiCheck({ options, value = [], onChange, custom = false }) {
         setTimeout(() => inputRef.current?.focus(), 0)
       } else {
         setOtherClicked(false)
+        setCustomInput('')
         if (hasCustom) {
           // Also clear any custom-typed values so the toggle feels symmetric.
           onChange(value.filter((v) => options.includes(v) && !isOther(v)))
@@ -74,10 +76,12 @@ export function MultiCheck({ options, value = [], onChange, custom = false }) {
           ref={inputRef}
           type="text"
           placeholder="직접 입력 (쉼표로 여러 개 입력 가능)"
-          value={customStr}
+          value={customInput}
           onChange={(e) => {
+            const raw = e.target.value
+            setCustomInput(raw)
             const fixed = value.filter((v) => options.includes(v) && !isOther(v))
-            const extras = e.target.value
+            const extras = raw
               .split(',')
               .map((s) => s.trim())
               .filter(Boolean)
