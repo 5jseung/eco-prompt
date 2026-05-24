@@ -24,44 +24,55 @@ const SPECIES = {
   articleLabel: '효율적인 프롬프팅이 기후위기에 주는 영향 →',
 }
 
+// How long the APNG animations actually run before they would loop.
+// We swap to a static still after this so the seal "stops moving".
+const STAGE_ANIM_MS = 1500
+const CELEBRATION_MS = 2000
+
 export default function Character({ filledCount, justCheered }) {
   const stage = stageFor(filledCount)
-  const [celebrating, setCelebrating] = useState(false)
-  const [hasCelebrated, setHasCelebrated] = useState(false)
-  const [hover, setHover] = useState(false)
-  const cheeredOnce = useRef(false)
 
-  // Celebration: plays exactly ONCE, only when the user hits 프롬프트 생성하기
-  // (i.e. when `justCheered` flips true). Not on per-section completion.
-  // After it finishes, the character settles into a static still frame
-  // (using the original seal-N.png) and stays put.
+  // Three possible visual modes:
+  //   'static'        → not moving, shows /seal/seal-{stage}.png
+  //   'stage-anim'    → APNG /seal/anim/stage{stage}.png playing once
+  //   'celebrating'   → APNG /seal/anim/final_celebration.png playing once
+  const [mode, setMode] = useState('static')
+  const prevStage = useRef(stage)
+  const [hover, setHover] = useState(false)
+
+  // Stage changed (user just filled / unfilled a new section) → play stage
+  // animation ONCE, then settle back to static so the seal stops moving.
+  useEffect(() => {
+    if (stage === prevStage.current) return
+    prevStage.current = stage
+    setMode('stage-anim')
+    const t = setTimeout(() => setMode('static'), STAGE_ANIM_MS)
+    return () => clearTimeout(t)
+  }, [stage])
+
+  // User clicked 프롬프트 생성하기 → celebrate ONCE then go static.
+  // (Wins over a stage-anim if both fire close together.)
   useEffect(() => {
     if (!justCheered) return
-    if (cheeredOnce.current) return
-    cheeredOnce.current = true
-    setCelebrating(true)
-    const t = setTimeout(() => {
-      setCelebrating(false)
-      setHasCelebrated(true)
-    }, 2000)
+    setMode('celebrating')
+    const t = setTimeout(() => setMode('static'), CELEBRATION_MS)
     return () => clearTimeout(t)
   }, [justCheered])
 
-  // Pick which asset to show:
-  //  - celebrating  → final_celebration APNG (one-shot via remount via key)
-  //  - hasCelebrated → static seal-N.png   (no motion, "remain without moving")
-  //  - else         → looping APNG stage   (idle / fill-in)
+  // Pick which asset to show. The `key` is what forces an APNG to restart
+  // from frame 1 — without it, the browser keeps it on whatever frame it
+  // was on (and will keep looping invisibly).
   let src
   let key
-  if (celebrating) {
+  if (mode === 'celebrating') {
     src = '/seal/anim/final_celebration.png'
     key = `cheer-${Date.now()}`
-  } else if (hasCelebrated) {
-    src = `/seal/seal-${stage}.png`
-    key = `settled-${stage}`
-  } else {
+  } else if (mode === 'stage-anim') {
     src = `/seal/anim/stage${stage}.png`
-    key = `stage-${stage}`
+    key = `stage-anim-${stage}-${Date.now()}`
+  } else {
+    src = `/seal/seal-${stage}.png`
+    key = `static-${stage}`
   }
 
   return (
@@ -102,7 +113,7 @@ export default function Character({ filledCount, justCheered }) {
       <img
         key={key}
         src={src}
-        alt={celebrating ? 'seal celebrating' : `seal stage ${stage}`}
+        alt={mode === 'celebrating' ? 'seal celebrating' : `seal stage ${stage}`}
         className="w-40 h-40 sm:w-48 sm:h-48 object-contain drop-shadow cursor-pointer"
       />
     </div>
