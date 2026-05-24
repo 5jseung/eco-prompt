@@ -75,7 +75,9 @@ hci/
 │   └── generate.js        # Vercel serverless: asks Gemini to write a final prompt if key is set
 ├── docs/                  # meeting notes, wireframes, original PDFs
 ├── public/
-│   └── seal/              # seal-1..5.png (sad → happy)
+│   └── seal/
+│       ├── seal-1..5.png  # static stills (used in the header favicon etc.)
+│       └── anim/          # stage1..5.png + final_celebration.png (animated APNG)
 ├── src/
 │   ├── components/
 │   │   ├── Character.jsx  # bottom-right seal expression + animation
@@ -111,12 +113,13 @@ hci/
 
 ## Current UX behavior
 
-- The bottom-right seal changes expression based on completed section count:
-  - 0 sections → `seal-1`
-  - 1-3 sections → `seal-2`
-  - 4 sections → `seal-3`
-  - 5 sections → `seal-4`
-  - 6+ sections → `seal-5`
+- The bottom-right seal is an animated APNG that changes stage based on completed section count:
+  - 0 sections → `stage1` (sad)
+  - 1-3 sections → `stage2`
+  - 4 sections → `stage3`
+  - 5 sections → `stage4`
+  - 6+ sections → `stage5` (happiest)
+- When a new section is completed OR the user clicks 프롬프트 생성하기, the seal plays `final_celebration` for ~1.8s and then returns to its idle stage.
 - The seal no longer shows always-on speech-bubble facts. This avoids unsupported environmental claims during user testing.
 - After prompt generation, every section collapses into a summary showing only selected or typed values.
 - A collapsed section can be clicked anywhere to reopen it. Open sections show a small `접기` control.
@@ -166,9 +169,22 @@ Rules of thumb:
 
 ## What's still TODO
 
-- [ ] Penguin and bee character sprites (only seal is wired up)
-- [ ] Hover info card for endangered species, ideally with sourced animal facts
-- [ ] Article/source links on character click
+Deferred to a later round (not blocking the 2026-05-23 deliverable):
+
+- [ ] **Reference image upload per section** (called for in 0505 회의록 — each section optionally takes a reference image + a free-text "what to use from it")
+- [ ] Penguin and bee character variants (only seal is animated; art TBD by 현진)
+- [ ] Hover info card for endangered species + article/source links on character click (0517 회의록)
 - [ ] Decide whether to bring back speech-bubble content with cited sources
 - [ ] Tighten copy / Korean strings before user study
 - [ ] Test Gemini prompt quality across sparse, Korean, and highly detailed inputs
+
+## Done in this round
+
+- Vite + React + Tailwind scaffold, deployable to Vercel
+- 8 prompt sections built from the wireframe
+- Gemini API serverless function that rewrites the form into a polished English image-generation prompt; falls back to local draft when no key is configured
+- Local Vite middleware so `/api/generate` works in `npm run dev` (no `vercel dev` needed)
+- Sections collapse into summary chips after generation; click any to reopen and edit
+- Bottom prompt panel is editable; 복사 copies the edited text
+- Animated APNG seal character with 5 stages + celebration animation
+- Korean teammate onboarding + briefing scripts under `docs/`
