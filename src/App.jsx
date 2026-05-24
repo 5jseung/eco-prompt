@@ -156,7 +156,7 @@ export default function App() {
         </div>
       </footer>
 
-      <Character filledCount={filled} justCheered={cheered} />
+      <Character filledCount={filled} justCheered={cheered} isComplete={filled === SECTIONS.length} />
     </div>
   )
 }

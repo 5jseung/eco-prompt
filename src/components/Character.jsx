@@ -24,17 +24,19 @@ const SPECIES = {
   articleLabel: '효율적인 프롬프팅이 기후위기에 주는 영향 →',
 }
 
-// How long the stage APNG runs before it would loop.
-// We swap to the matching static still after this so the seal "stops moving".
+// How long each APNG runs before it would loop.
+// We swap to a static still after this so the seal "stops moving".
 const STAGE_ANIM_MS = 1500
+const CELEBRATION_MS = 2000
 
-export default function Character({ filledCount, justCheered }) {
+export default function Character({ filledCount, justCheered, isComplete = false }) {
   const stage = stageFor(filledCount)
 
-  // Two possible visual modes:
-  //   'static'     → not moving, shows /seal/seal-{stage}.png (first frame of the stage APNG)
-  //   'stage-anim' → /seal/anim/stage{stage}.png playing once
-  // Generate-press just re-triggers a stage-anim of the CURRENT stage.
+  // Three possible visual modes:
+  //   'static'      → not moving, shows /seal/seal-{stage}.png
+  //   'stage-anim'  → /seal/anim/stage{stage}.png playing once
+  //   'celebrating' → /seal/anim/final_celebration.png playing once
+  //                   (only when generate is pressed AND all sections filled)
   const [mode, setMode] = useState('static')
   const prevStage = useRef(stage)
   const [hover, setHover] = useState(false)
@@ -52,20 +54,26 @@ export default function Character({ filledCount, justCheered }) {
     return () => clearTimeout(t)
   }, [stage])
 
-  // User clicked 프롬프트 생성하기 → replay the CURRENT stage anim once.
+  // User clicked 프롬프트 생성하기. If the form is 100% complete, play the
+  // final celebration (with the hat); otherwise replay the current stage anim.
   useEffect(() => {
     if (!justCheered) return
-    setMode('stage-anim')
+    const nextMode = isComplete ? 'celebrating' : 'stage-anim'
+    setMode(nextMode)
     setAnimToken((n) => n + 1)
-    const t = setTimeout(() => setMode('static'), STAGE_ANIM_MS)
+    const duration = isComplete ? CELEBRATION_MS : STAGE_ANIM_MS
+    const t = setTimeout(() => setMode('static'), duration)
     return () => clearTimeout(t)
-  }, [justCheered])
+  }, [justCheered, isComplete])
 
   // Pick which asset to show. `key` differs every animation run so the
   // browser remounts the <img> and the APNG plays from frame 1.
   let src
   let key
-  if (mode === 'stage-anim') {
+  if (mode === 'celebrating') {
+    src = '/seal/anim/final_celebration.png'
+    key = `cheer-${animToken}`
+  } else if (mode === 'stage-anim') {
     src = `/seal/anim/stage${stage}.png`
     key = `stage-anim-${stage}-${animToken}`
   } else {
