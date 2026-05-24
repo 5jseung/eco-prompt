@@ -24,52 +24,50 @@ const SPECIES = {
   articleLabel: '효율적인 프롬프팅이 기후위기에 주는 영향 →',
 }
 
-// How long the APNG animations actually run before they would loop.
-// We swap to a static still after this so the seal "stops moving".
+// How long the stage APNG runs before it would loop.
+// We swap to the matching static still after this so the seal "stops moving".
 const STAGE_ANIM_MS = 1500
-const CELEBRATION_MS = 2000
 
 export default function Character({ filledCount, justCheered }) {
   const stage = stageFor(filledCount)
 
-  // Three possible visual modes:
-  //   'static'        → not moving, shows /seal/seal-{stage}.png
-  //   'stage-anim'    → APNG /seal/anim/stage{stage}.png playing once
-  //   'celebrating'   → APNG /seal/anim/final_celebration.png playing once
+  // Two possible visual modes:
+  //   'static'     → not moving, shows /seal/seal-{stage}.png (first frame of the stage APNG)
+  //   'stage-anim' → /seal/anim/stage{stage}.png playing once
+  // Generate-press just re-triggers a stage-anim of the CURRENT stage.
   const [mode, setMode] = useState('static')
   const prevStage = useRef(stage)
   const [hover, setHover] = useState(false)
+  // Bumped on every animation trigger to force <img> remount so the APNG
+  // restarts from frame 1 (browsers won't replay an APNG otherwise).
+  const [animToken, setAnimToken] = useState(0)
 
-  // Stage changed (user just filled / unfilled a new section) → play stage
-  // animation ONCE, then settle back to static so the seal stops moving.
+  // Stage changed (user just filled / unfilled a section) → play once.
   useEffect(() => {
     if (stage === prevStage.current) return
     prevStage.current = stage
     setMode('stage-anim')
+    setAnimToken((n) => n + 1)
     const t = setTimeout(() => setMode('static'), STAGE_ANIM_MS)
     return () => clearTimeout(t)
   }, [stage])
 
-  // User clicked 프롬프트 생성하기 → celebrate ONCE then go static.
-  // (Wins over a stage-anim if both fire close together.)
+  // User clicked 프롬프트 생성하기 → replay the CURRENT stage anim once.
   useEffect(() => {
     if (!justCheered) return
-    setMode('celebrating')
-    const t = setTimeout(() => setMode('static'), CELEBRATION_MS)
+    setMode('stage-anim')
+    setAnimToken((n) => n + 1)
+    const t = setTimeout(() => setMode('static'), STAGE_ANIM_MS)
     return () => clearTimeout(t)
   }, [justCheered])
 
-  // Pick which asset to show. The `key` is what forces an APNG to restart
-  // from frame 1 — without it, the browser keeps it on whatever frame it
-  // was on (and will keep looping invisibly).
+  // Pick which asset to show. `key` differs every animation run so the
+  // browser remounts the <img> and the APNG plays from frame 1.
   let src
   let key
-  if (mode === 'celebrating') {
-    src = '/seal/anim/final_celebration.png'
-    key = `cheer-${Date.now()}`
-  } else if (mode === 'stage-anim') {
+  if (mode === 'stage-anim') {
     src = `/seal/anim/stage${stage}.png`
-    key = `stage-anim-${stage}-${Date.now()}`
+    key = `stage-anim-${stage}-${animToken}`
   } else {
     src = `/seal/seal-${stage}.png`
     key = `static-${stage}`
@@ -113,7 +111,7 @@ export default function Character({ filledCount, justCheered }) {
       <img
         key={key}
         src={src}
-        alt={mode === 'celebrating' ? 'seal celebrating' : `seal stage ${stage}`}
+        alt={`seal stage ${stage}`}
         className="w-40 h-40 sm:w-48 sm:h-48 object-contain drop-shadow cursor-pointer"
       />
     </div>
