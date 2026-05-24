@@ -72,7 +72,7 @@ export default function App() {
           <div className="flex items-center gap-3">
             <img src="/seal/seal-3.png" alt="" className="w-8 h-8 object-contain" />
             <div>
-              <h1 className="text-base font-semibold text-slate-900">Interactive Exhibition Genie</h1>
+              <h1 className="text-base font-semibold text-slate-900">Eco Prompt Generator</h1>
               <p className="text-xs text-slate-500">이미지 생성 에코 모드 · 상세 프롬프트 템플릿</p>
             </div>
           </div>
