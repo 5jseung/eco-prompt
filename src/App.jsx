@@ -73,7 +73,6 @@ export default function App() {
             <img src="/seal/seal-3.png" alt="" className="w-8 h-8 object-contain" />
             <div>
               <h1 className="text-base font-semibold text-slate-900">Eco Prompt Generator</h1>
-              <p className="text-xs text-slate-500">이미지 생성 에코 모드 · 상세 프롬프트 템플릿</p>
             </div>
           </div>
           <div className="flex items-center gap-2 text-xs text-eco-600 bg-eco-50 px-3 py-1.5 rounded-full">
@@ -88,7 +87,7 @@ export default function App() {
 
       <main className="max-w-6xl mx-auto px-6 py-6">
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <Column title="[필수 섹션] REQUIRED" tone="required">
+          <Column title="필수 섹션" tone="required">
             {required.map((s) => (
               <Section
                 key={s.id}
@@ -101,7 +100,7 @@ export default function App() {
               />
             ))}
           </Column>
-          <Column title="[선택 섹션] OPTIONAL" tone="optional">
+          <Column title="선택 섹션" tone="optional">
             {optional.map((s) => (
               <Section
                 key={s.id}

@@ -1,15 +1,23 @@
 import { MultiCheck, SingleSelect, TextInput, TextArea } from './Field.jsx'
 import { isSectionFilled } from '../utils/buildPrompt.js'
 
-function renderField(field, value, onChange) {
+function renderField(field, value, onChange, showInputLabel = false) {
   if (field.type === 'multi')
-    return <MultiCheck options={field.options} value={value} onChange={onChange} custom={field.custom} />
+    return (
+      <MultiCheck
+        options={field.options}
+        value={value}
+        onChange={onChange}
+        custom={field.custom}
+        placeholder={field.placeholder}
+      />
+    )
   if (field.type === 'single')
     return <SingleSelect options={field.options} value={value} onChange={onChange} />
   if (field.type === 'text')
-    return <TextInput value={value} onChange={onChange} placeholder={field.placeholder} />
+    return <TextInput value={value} onChange={onChange} placeholder={field.placeholder} showLabel={showInputLabel} />
   if (field.type === 'textarea')
-    return <TextArea value={value} onChange={onChange} placeholder={field.placeholder} />
+    return <TextArea value={value} onChange={onChange} placeholder={field.placeholder} showLabel={showInputLabel} />
   return null
 }
 
@@ -82,9 +90,9 @@ export default function Section({ section, value, onChange, collapsed = false, o
         <h2 className="text-sm font-semibold text-slate-800">
           {section.title}{' '}
           {section.required ? (
-            <span className="text-xs text-red-500 ml-1">REQUIRED</span>
+            <span className="text-xs text-red-500 ml-1">필수</span>
           ) : (
-            <span className="text-xs text-slate-400 ml-1">OPTIONAL</span>
+            <span className="text-xs text-slate-400 ml-1">선택</span>
           )}
         </h2>
         <div className="flex shrink-0 items-center gap-2">
@@ -116,7 +124,7 @@ export default function Section({ section, value, onChange, collapsed = false, o
           ))}
         </div>
       ) : (
-        renderField(section, value, onChange)
+        renderField(section, value, onChange, true)
       )}
     </section>
   )

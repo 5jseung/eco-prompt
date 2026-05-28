@@ -20,14 +20,31 @@ const SPECIES = {
   population: '약 94만 마리 (1999년 대비 50% ↓)',
   habitat: '남극 사우스조지아 섬 일대',
   source: 'https://iucn.org/press-release/202604/emperor-penguin-and-antarctic-fur-seal-now-endangered-due-climate-change-iucn',
-  article: 'https://brunch.co.kr/@greenpeacekorea/391',
-  articleLabel: '효율적인 프롬프팅이 기후위기에 주는 영향 →',
 }
 
 // How long each APNG runs before it would loop.
 // We swap to a static still after this so the seal "stops moving".
 const STAGE_ANIM_MS = 1500
 const CELEBRATION_MS = 2000
+const HOVER_CLOSE_DELAY_MS = 250
+const SEAL_ASSET_VERSION = 'bg-clean-1'
+const SEAL_ASSET_PATHS = [
+  '/seal/seal-1.png',
+  '/seal/seal-2.png',
+  '/seal/seal-3.png',
+  '/seal/seal-4.png',
+  '/seal/seal-5.png',
+  '/seal/anim/stage1.png',
+  '/seal/anim/stage2.png',
+  '/seal/anim/stage3.png',
+  '/seal/anim/stage4.png',
+  '/seal/anim/stage5.png',
+  '/seal/anim/final_celebration.png',
+]
+
+function sealAsset(path) {
+  return `${path}?v=${SEAL_ASSET_VERSION}`
+}
 
 export default function Character({ filledCount, justCheered, isComplete = false }) {
   const stage = stageFor(filledCount)
@@ -38,21 +55,22 @@ export default function Character({ filledCount, justCheered, isComplete = false
   //   'celebrating' → /seal/anim/final_celebration.png playing once
   //                   (only when generate is pressed AND all sections filled)
   const [mode, setMode] = useState('static')
-  const prevStage = useRef(stage)
+  const prevFilledCount = useRef(filledCount)
+  const hoverCloseTimer = useRef(null)
   const [hover, setHover] = useState(false)
   // Bumped on every animation trigger to force <img> remount so the APNG
   // restarts from frame 1 (browsers won't replay an APNG otherwise).
   const [animToken, setAnimToken] = useState(0)
 
-  // Stage changed (user just filled / unfilled a section) → play once.
+  // Filled section count changed → replay the current stage animation once.
   useEffect(() => {
-    if (stage === prevStage.current) return
-    prevStage.current = stage
+    if (filledCount === prevFilledCount.current) return
+    prevFilledCount.current = filledCount
     setMode('stage-anim')
     setAnimToken((n) => n + 1)
     const t = setTimeout(() => setMode('static'), STAGE_ANIM_MS)
     return () => clearTimeout(t)
-  }, [stage])
+  }, [filledCount])
 
   // User clicked 프롬프트 생성하기. If the form is 100% complete, play the
   // final celebration (with the hat); otherwise replay the current stage anim.
@@ -66,29 +84,63 @@ export default function Character({ filledCount, justCheered, isComplete = false
     return () => clearTimeout(t)
   }, [justCheered, isComplete])
 
+  useEffect(() => {
+    return () => {
+      if (hoverCloseTimer.current) clearTimeout(hoverCloseTimer.current)
+    }
+  }, [])
+
+  useEffect(() => {
+    const preloaded = SEAL_ASSET_PATHS.map((path) => {
+      const img = new Image()
+      img.src = sealAsset(path)
+      return img
+    })
+    return () => {
+      preloaded.forEach((img) => {
+        img.onload = null
+        img.onerror = null
+      })
+    }
+  }, [])
+
+  function showHover() {
+    if (hoverCloseTimer.current) clearTimeout(hoverCloseTimer.current)
+    setHover(true)
+  }
+
+  function scheduleHideHover() {
+    if (hoverCloseTimer.current) clearTimeout(hoverCloseTimer.current)
+    hoverCloseTimer.current = setTimeout(() => setHover(false), HOVER_CLOSE_DELAY_MS)
+  }
+
   // Pick which asset to show. `key` differs every animation run so the
   // browser remounts the <img> and the APNG plays from frame 1.
   let src
   let key
   if (mode === 'celebrating') {
-    src = '/seal/anim/final_celebration.png'
+    src = sealAsset('/seal/anim/final_celebration.png')
     key = `cheer-${animToken}`
   } else if (mode === 'stage-anim') {
-    src = `/seal/anim/stage${stage}.png`
+    src = sealAsset(`/seal/anim/stage${stage}.png`)
     key = `stage-anim-${stage}-${animToken}`
   } else {
-    src = `/seal/seal-${stage}.png`
+    src = sealAsset(`/seal/seal-${stage}.png`)
     key = `static-${stage}`
   }
 
   return (
     <div
       className="fixed bottom-4 right-4 z-50"
-      onMouseEnter={() => setHover(true)}
-      onMouseLeave={() => setHover(false)}
+      onMouseEnter={showHover}
+      onMouseLeave={scheduleHideHover}
     >
       {hover && (
-        <div className="absolute bottom-full right-0 mb-2 w-72 bg-white border border-slate-200 rounded-xl shadow-xl p-3 text-xs text-slate-700">
+        <div
+          className="absolute bottom-full right-0 mb-2 w-72 bg-white border border-slate-200 rounded-xl shadow-xl p-3 text-xs text-slate-700"
+          onMouseEnter={showHover}
+          onMouseLeave={scheduleHideHover}
+        >
           <div className="font-semibold text-slate-900 mb-1.5">{SPECIES.name}</div>
           <div className="grid grid-cols-[auto_1fr] gap-x-2 gap-y-0.5">
             <span className="text-slate-400">서식지</span>
@@ -99,20 +151,12 @@ export default function Character({ filledCount, justCheered, isComplete = false
             <span>{SPECIES.reason}</span>
           </div>
           <a
-            href={SPECIES.article}
+            href={SPECIES.source}
             target="_blank"
             rel="noreferrer noopener"
             className="block mt-2 pt-2 border-t border-slate-100 text-eco-600 hover:underline"
           >
-            {SPECIES.articleLabel}
-          </a>
-          <a
-            href={SPECIES.source}
-            target="_blank"
-            rel="noreferrer noopener"
-            className="block mt-0.5 text-[10px] text-slate-400 hover:underline"
-          >
-            출처: IUCN
+            관련 뉴스 기사 보기
           </a>
         </div>
       )}
