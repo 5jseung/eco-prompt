@@ -72,7 +72,7 @@ export default function App() {
           <div className="flex items-center gap-3">
             <img src="/seal/seal-3.png" alt="" className="w-8 h-8 object-contain" />
             <div>
-              <h1 className="text-base font-semibold text-slate-900">Eco Prompt Generator</h1>
+              <h1 className="text-base font-semibold text-slate-900">Prompt Generator</h1>
             </div>
           </div>
           <div className="flex items-center gap-2 text-xs text-eco-600 bg-eco-50 px-3 py-1.5 rounded-full">
